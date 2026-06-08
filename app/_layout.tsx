@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { I18nManager } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
+import { Session } from '@supabase/supabase-js'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -12,24 +13,32 @@ if (!I18nManager.isRTL) {
   I18nManager.forceRTL(true)
 }
 
+// ─── Auth guard ───────────────────────────────────────────────────────────────
+// SDK 52 uses useSegments + useRouter instead of Stack.Protected
+
+function useProtectedRoute(session: Session | null, loading: boolean) {
+  const segments  = useSegments()
+  const router    = useRouter()
+
+  useEffect(() => {
+    if (loading) return
+    const inApp = segments[0] === '(app)'
+    if (!session && inApp)  router.replace('/sign-in')
+    if (session  && !inApp) router.replace('/(app)')
+  }, [session, loading, segments])
+}
+
 function RootNavigator() {
   const { session, loading } = useAuth()
+
+  useProtectedRoute(session, loading)
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync()
   }, [loading])
 
-  if (loading) return null
-
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!session}>
-        <Stack.Screen name="(app)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!session}>
-        <Stack.Screen name="sign-in" />
-      </Stack.Protected>
-    </Stack>
+    <Stack screenOptions={{ headerShown: false }} />
   )
 }
 
